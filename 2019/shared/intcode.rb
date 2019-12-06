@@ -3,6 +3,12 @@ class Program
     @program = program
   end
 
+  def iptr
+    current_iptr = @iptr
+    @iptr = nil
+    current_iptr
+  end
+
   def [](*index)
     @program[*index]
   end
@@ -22,14 +28,15 @@ class IntcodeComputer
     @instruction_set = instruction_set
   end
 
-  def run(program)
+  def run(program, debug = false)
     instruction_pointer = 0
 
     until (opcode = program[instruction_pointer]) == 99
       instruction = @instruction_set[opcode]
-      params = program[instruction_pointer + 1, instruction.arity]
+      params = program[instruction_pointer + 1, instruction&.arity || 0]
+      p "-- #{opcode}(#{params.join(',')})" if debug
       program.instance_exec(*params, &instruction)
-      instruction_pointer += 1 + params.count
+      instruction_pointer = program.iptr || instruction_pointer + 1 + params.count
     end
 
     program
