@@ -15,8 +15,8 @@ INSTRUCTION_SET = {
   3 => ->(c) { print ">>"; @program[c] = !@stdin.empty? ? p(@stdin.shift) : STDIN.gets.to_i },
   
   # get
-    4 => ->(c) { p @program[c] },
-  104 => ->(c) { p c },
+    4 => ->(c) { @stdout << p @program[c] },
+  104 => ->(c) { @stdout << p c },
 
   # jump-if-true
      5 => ->(a,b) { !@program[a].zero? && @iptr = @program[b] },
@@ -47,12 +47,17 @@ class Program
   def initialize(program = [99], stdin = [])
     @program = program.clone
     @stdin = stdin
+    @stdout = []
   end
 
   def iptr
     current_iptr = @iptr
     @iptr = nil
     current_iptr
+  end
+
+  def output
+    @stdout.last
   end
 
   def [](*index)
