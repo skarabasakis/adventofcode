@@ -1,48 +1,24 @@
 class InterruptError < StandardError; end;
 
+RESOLVE= {
+  val: {
+    0 => ->(operand) { @program[operand] },           # position
+    1 => ->(operand) { operand },                     # immediate
+  },
+  idx: {
+    0 => ->(idx) { idx },                             # position
+  }
+}
+
 INSTRUCTION_SET = {
-  # add
-     1 => ->(a,b,c) { @program[c] = @program[a] + @program[b] },
-   101 => ->(a,b,c) { @program[c] = a + @program[b] },
-  1001 => ->(a,b,c) { @program[c] = @program[a] + b },
-  1101 => ->(a,b,c) { @program[c] = a + b },
-
-  # multiply
-     2 => ->(a,b,c) { @program[c] = @program[a] * @program[b] },
-   102 => ->(a,b,c) { @program[c] = a * @program[b] },
-  1002 => ->(a,b,c) { @program[c] = @program[a] * b },
-  1102 => ->(a,b,c) { @program[c] = a * b },
-
-  # set
-  3 => ->(c) { @program[c] = @stdin.shift || interrupt },
-  
-  # get
-    4 => ->(c) { @stdout << @program[c] },
-  104 => ->(c) { @stdout << c },
-
-  # jump-if-true
-     5 => ->(a,b) { !@program[a].zero? && @iptr = @program[b] },
-   105 => ->(a,b) { !a.zero? && @iptr = @program[b] },
-  1005 => ->(a,b) { !@program[a].zero? && @iptr = b },
-  1105 => ->(a,b) { !a.zero? && @iptr = b },
-
-  # jump-if-false
-     6 => ->(a,b) { @program[a].zero? && @iptr = @program[b] },
-   106 => ->(a,b) { a.zero? && @iptr = @program[b] },
-  1006 => ->(a,b) { @program[a].zero? && @iptr = b },
-  1106 => ->(a,b) { a.zero? && @iptr = b },
-
-  # less-than
-     7 => ->(a,b,c) { @program[c] = @program[a] < @program[b] ? 1 : 0 },
-   107 => ->(a,b,c) { @program[c] = a < @program[b] ? 1 : 0 },
-  1007 => ->(a,b,c) { @program[c] = @program[a] < b ? 1 : 0 },
-  1107 => ->(a,b,c) { @program[c] = a < b ? 1 : 0 },
-
-  # equals
-     8 => ->(a,b,c) { @program[c] = @program[a] == @program[b] ? 1 : 0 },
-   108 => ->(a,b,c) { @program[c] = a == @program[b] ? 1 : 0 },
-  1008 => ->(a,b,c) { @program[c] = @program[a] == b ? 1 : 0 },
-  1108 => ->(a,b,c) { @program[c] = a == b ? 1 : 0 },
+  1 => ->(a,b,idx) { @program[idx] = a + b },                  # add
+  2 => ->(a,b,idx) { @program[idx] = a * b },                  # multiply
+  3 => ->(idx) { @program[idx] = @stdin.shift || interrupt },  # set
+  4 => ->(a) { @stdout << a },                                 # get
+  5 => ->(a,b) { !a.zero? && @iptr = b },                      # jump-if-true
+  6 => ->(a,b) { a.zero? && @iptr = b },                       # jump-if-false
+  7 => ->(a,b,idx) { @program[idx] = a < b ? 1 : 0 },          # less-than
+  8 => ->(a,b,idx) { @program[idx] = a == b ? 1 : 0 },         # equals
 }.freeze
 
 class Program
@@ -112,11 +88,26 @@ class IntcodeComputer
     @instruction_set = instruction_set
   end
 
+  def instruction_param_types
+    @instruction_param_types ||= INSTRUCTION_SET.map do |op, instruction| 
+      [op, instruction.parameters.map { |p| p.last == :idx ? :idx : :val }]
+    end.to_h
+  end
+
   def fetch(program)
-    instruction = @instruction_set[program.opcode]
-    raise "Invalid instruction: #{program.opcode}" if instruction.nil?
-    params = program[program.iptr + 1, instruction.arity]
+    modes, op = program.opcode.divmod(100)
+
+    instruction = @instruction_set[op]
+
+    params = program[program.iptr + 1, instruction.arity].each_with_index.map do |param, i|
+      type = instruction_param_types[op][i]
+      mode = modes.digits[i].to_i || 0
+      resolve = RESOLVE[type][mode] 
+      program.instance_exec(param, &RESOLVE[type][mode])
+    end
+
     program.iptr += 1 + instruction.arity
+
     [instruction, params] 
   end
 
