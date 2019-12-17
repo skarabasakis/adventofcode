@@ -1,17 +1,17 @@
 PROGRAM = load_array '2019/input/05'
 require_relative 'shared/intcode'
 
-def exec
-  program = Program.new(PROGRAM);
+def exec(input)
+  program = Program.new(PROGRAM, input);
   computer = IntcodeComputer.new
   
   computer.run(program)
 end
 
 # Part A
-exec # and type 1
+p exec([1])
 
 # Part B
-exec # and type 5
+p exec([5])
 
 
