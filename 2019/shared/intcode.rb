@@ -2,11 +2,13 @@ class InterruptError < StandardError; end;
 
 RESOLVE= {
   val: {
-    0 => ->(operand) { @program[operand] },           # position
-    1 => ->(operand) { operand },                     # immediate
+    0 => ->(operand) { @program[operand].to_i },         # position
+    1 => ->(operand) { operand },                        # immediate
+    2 => ->(operand) { @program[@base + operand].to_i }  # relative
   },
   idx: {
-    0 => ->(idx) { idx },                             # position
+    0 => ->(idx) { idx },                                # position
+    2 => ->(idx) { @base + idx }                         # relative
   }
 }
 
@@ -19,6 +21,7 @@ INSTRUCTION_SET = {
   6 => ->(a,b) { a.zero? && @iptr = b },                       # jump-if-false
   7 => ->(a,b,idx) { @program[idx] = a < b ? 1 : 0 },          # less-than
   8 => ->(a,b,idx) { @program[idx] = a == b ? 1 : 0 },         # equals
+  9 => ->(a) { @base += a }                                    # relative-base-offset
 }.freeze
 
 class Program
@@ -30,6 +33,7 @@ class Program
     @program = program.clone
     @stdin = stdin
     @stdout = []
+    @base = 0
   end
 
   def interrupt
@@ -70,6 +74,7 @@ class Program
   end
 
   def [](*index)
+    raise "Negative index" if index[0] < 0
     @program[*index]
   end
 
